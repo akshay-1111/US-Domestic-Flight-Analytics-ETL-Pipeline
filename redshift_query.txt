@@ -1,0 +1,88 @@
+--CREATE TABLE us_flights (
+--    year INT,
+--    month INT,
+--    day INT,
+--    dep_time INT,
+--    arr_time INT,
+--    origin VARCHAR(10),
+--    dest VARCHAR(10),
+--    arr_delay INT,
+--    dep_delay INT,
+--    distance INT,
+--    unique_carrier VARCHAR(10),
+--    flight_num BIGINT, 
+--    tail_num VARCHAR(10),
+--    origin_name VARCHAR(255),
+--    origin_country VARCHAR(50),
+--    dest_name VARCHAR(255),
+--    dest_country VARCHAR(50)
+--);
+
+
+--COPY us_flights
+--FROM 's3://flights-etl/processed/us_flights/'
+--IAM_ROLE 'arn:aws:iam::889351495092:role/redshift-role'
+--FORMAT AS PARQUET;
+
+--SELECT * FROM us_flights LIMIT 10;
+
+
+
+--SELECT dest_name, AVG(arr_delay) as avg_arrival_delay
+--FROM us_flights
+--GROUP BY dest_name
+--ORDER BY avg_arrival_delay DESC
+--LIMIT 10;
+---------------------------------------------------------------------------
+
+
+
+
+
+
+----------------------------------
+--VIEWS CREATING
+------------------------------------
+--CREATE OR REPLACE VIEW most_delayed_routes AS
+--SELECT
+--  origin,
+--  origin_name,
+--  dest,
+--  dest_name,
+--  COUNT(*) AS flight_count,
+--  AVG(arr_delay) AS avg_arrival_delay
+--FROM us_flights
+--WHERE arr_delay IS NOT NULL
+--GROUP BY origin, origin_name, dest, dest_name
+--HAVING COUNT(*) > 5  -- filter out rare routes
+--ORDER BY avg_arrival_delay DESC;
+
+
+
+
+--CREATE OR REPLACE VIEW origin_airport_delay AS
+--SELECT
+--  origin,
+--  origin_name,
+--  COUNT(*) AS total_flights,
+--  AVG(dep_delay) AS avg_departure_delay
+--FROM us_flights
+--WHERE dep_delay IS NOT NULL
+--GROUP BY origin, origin_name
+--ORDER BY avg_departure_delay DESC;
+--
+
+--
+--CREATE OR REPLACE VIEW delay_recovery_efficiency AS
+--SELECT
+--  origin_name,
+--  dest_name,
+--  COUNT(*) AS total_flights,
+--  ROUND(AVG(dep_delay), 1) AS avg_dep_delay,
+--  ROUND(AVG(arr_delay), 1) AS avg_arr_delay,
+--  ROUND(AVG(dep_delay - arr_delay), 1) AS recovery_efficiency
+--FROM us_flights
+--WHERE arr_delay IS NOT NULL AND dep_delay IS NOT NULL
+--GROUP BY origin_name, dest_name
+--ORDER BY recovery_efficiency DESC;
+--
