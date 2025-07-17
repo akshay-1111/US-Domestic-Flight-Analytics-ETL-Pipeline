@@ -31,6 +31,7 @@ This project demonstrates a batch ETL pipeline that ingests and analyzes US dome
 - Apache Airflow (Orchestration)
 - Plotly + Pandas (Data visualization)
 -Python (Core programming language)
+- Power BI(also done visualization through powerbi)
 
 ## 🧩 Airflow DAG Tasks
 
