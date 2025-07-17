@@ -1,0 +1,89 @@
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from pyspark.sql.functions import col, upper, trim
+
+# Set up job
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+# 1️⃣ Read raw flights table
+flights_df = glueContext.create_dynamic_frame.from_catalog(
+    database="flight_raw_db",
+    table_name="flights"
+).toDF()
+
+# 2️⃣ Read raw airports table
+airports_df = glueContext.create_dynamic_frame.from_catalog(
+    database="flight_raw_db",
+    table_name="airports"
+).toDF()
+
+# 3️⃣ Clean and cast necessary flight columns
+flights_df = flights_df.select(
+    col("year").cast("int"),
+    col("month").cast("int"),
+    col("day").cast("int"),
+    col("dep_time").cast("int"),
+    col("arr_time").cast("int"),
+    col("origin"),
+    col("dest"),
+    col("arr_delay").cast("int"),
+    col("dep_delay").cast("int"),
+    col("distance").cast("int"),
+    col("unique_carrier"),
+    col("flight_num"),
+    col("tail_num")
+)
+
+# 4️⃣ Clean airport data and rename columns
+airports_df = airports_df.select(
+    col("code").alias("airport_code"),
+    col("name").alias("airport_name"),
+    col("country").alias("airport_country")
+)
+
+# 5️⃣ Prepare join keys
+flights_df = flights_df.withColumn("origin_clean", upper(trim(col("origin")))) \
+                       .withColumn("dest_clean", upper(trim(col("dest"))))
+
+airports_df = airports_df.withColumn("airport_code_clean", upper(trim(col("airport_code"))))
+
+# 6️⃣ Join origin airport info
+flights_joined = flights_df.join(
+    airports_df,
+    flights_df.origin_clean == airports_df.airport_code_clean,
+    "left"
+).withColumnRenamed("airport_name", "origin_name") \
+ .withColumnRenamed("airport_country", "origin_country") \
+ .drop("airport_code", "airport_code_clean")
+
+# 7️⃣ Join destination airport info
+flights_final = flights_joined.join(
+    airports_df,
+    flights_joined.dest_clean == airports_df.airport_code_clean,
+    "left"
+).withColumnRenamed("airport_name", "dest_name") \
+ .withColumnRenamed("airport_country", "dest_country") \
+ .drop("airport_code", "airport_code_clean")
+
+# 8️⃣ Filter only US domestic flights
+flights_final = flights_final.filter(
+    (col("origin_country") == "US") & (col("dest_country") == "US")
+)
+
+# 9️⃣ Drop helper columns
+flights_final = flights_final.drop("origin_clean", "dest_clean")
+
+# 🔟 Write to S3 as Parquet
+flights_final.write.mode("overwrite").parquet("s3://flights-etl/processed/us_flights/")
+
+# ✅ Complete the job
+job.commit()  
